@@ -30,7 +30,7 @@ function main() {
   var colorBuffer = gl.createBuffer();
   // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = colorBuffer)
   gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-  // Put geometry data into buffer
+  // Put color data into buffer
   setColors(gl);
 
   function radToDeg(r) {
@@ -113,9 +113,25 @@ function main() {
     var zFar = 2000;
     var projectionMatrix = m4.perspective(fieldOfViewRadians, aspect, zNear, zFar);
 
-    // Compute a matrix for the camera
+    // Compute the position of the first F
+    var fPosition = [radius, 0, 0];
+
+    // Use matrix math to compute a position on a circle where
+    // the camera is
     var cameraMatrix = m4.yRotation(cameraAngleRadians);
     cameraMatrix = m4.translate(cameraMatrix, 0, 0, radius * 1.5);
+
+    // Get the camera's position from the matrix we computed
+    var cameraPosition = [
+      cameraMatrix[12],
+      cameraMatrix[13],
+      cameraMatrix[14],
+    ];
+
+    var up = [0, 1, 0];
+
+    // Compute the camera's matrix using look at.
+    var cameraMatrix = m4.lookAt(cameraPosition, fPosition, up);
 
     // Make a view matrix from the camera matrix
     var viewMatrix = m4.inverse(cameraMatrix);
@@ -144,7 +160,46 @@ function main() {
   }
 }
 
+function subtractVectors(a, b) {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function normalize(v) {
+  var length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  // make sure we don't divide by 0.
+  if (length > 0.00001) {
+    return [v[0] / length, v[1] / length, v[2] / length];
+  } else {
+    return [0, 0, 0];
+  }
+}
+
+function cross(a, b) {
+  return [a[1] * b[2] - a[2] * b[1],
+          a[2] * b[0] - a[0] * b[2],
+          a[0] * b[1] - a[1] * b[0]];
+}
+
+
+
 var m4 = {
+
+  lookAt: function(cameraPosition, target, up) {
+    var zAxis = normalize(
+        subtractVectors(cameraPosition, target));
+    var xAxis = normalize(cross(up, zAxis));
+    var yAxis = normalize(cross(zAxis, xAxis));
+
+    return [
+       xAxis[0], xAxis[1], xAxis[2], 0,
+       yAxis[0], yAxis[1], yAxis[2], 0,
+       zAxis[0], zAxis[1], zAxis[2], 0,
+       cameraPosition[0],
+       cameraPosition[1],
+       cameraPosition[2],
+       1,
+    ];
+  },
 
   perspective: function(fieldOfViewInRadians, aspect, near, far) {
     var f = Math.tan(Math.PI * 0.5 - 0.5 * fieldOfViewInRadians);
